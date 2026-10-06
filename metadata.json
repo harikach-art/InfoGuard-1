@@ -1,0 +1,7 @@
+{
+  "name": "InfoGuard",
+  "description": "Scholarship Source Conflict Auditor — Know what's true before you apply.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
