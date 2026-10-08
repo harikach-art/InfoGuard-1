@@ -530,7 +530,7 @@ Annual Family Income: ${applicant.annualFamilyIncome} (${applicant.currency || '
 State / Domicile: ${applicant.state}
 Gender: ${applicant.gender}
 Academic Percentage: ${applicant.academicPercentage || 'Not provided'}%
-Special Attributes: ${applicant.specialAttributes.join(', ') || 'None'}
+Special Attributes: ${(applicant.specialAttributes || []).join(', ') || 'None'}
 `;
 
   const systemInstruction = `You are INFOGUARD's precision scholarship source requirement extractor.

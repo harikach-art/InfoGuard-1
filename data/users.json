@@ -1,0 +1,26 @@
+[
+  {
+    "id": "da905f40-74c4-469b-9df2-31d95baa7217",
+    "name": "Scholarship Applicant",
+    "email": "applicant@gmail.com",
+    "passwordHash": "b9d178b84a7a6d29354d1c2e35bdb10bfbb974332a856507f7b9ea28c98338a6c7880748f5fed220d4a49e1a79b8279a3d9d9cff91ee79ab62735c678f6a0eca",
+    "salt": "d2a00eba18bd14abe8e27b6d14447264",
+    "createdAt": "2026-10-08T07:53:29.700Z"
+  },
+  {
+    "id": "a9df4cee-2f1a-4c8d-ae49-282f8209e640",
+    "name": "Test Applicant",
+    "email": "testapplicant@gmail.com",
+    "passwordHash": "e90af54335bc93ee04c67e97f888262b188ec956be0c6cad2b47bedc5a7d2ef65475aff5d126aca7f042e4c07c9b782b384ef7a931b5c1b3bf8f0806ff578b0e",
+    "salt": "443722bbf2998c181655a53a284a21ba",
+    "createdAt": "2026-10-08T12:18:38.308Z"
+  },
+  {
+    "id": "5ead2818-2cfb-45f7-a614-6fb87197c843",
+    "name": "Maria Garcia",
+    "email": "scholar@gmail.com",
+    "passwordHash": "73097de035303f81473d625b2799f784960b6cec7147ae0451955d817f6986f574452b2157192de8c6fa8d3c2acce02dfa1a77b4e625892b293fa61ee761d147",
+    "salt": "ec13160279be80b6afab128171d1ca73",
+    "createdAt": "2026-10-08T12:18:47.320Z"
+  }
+]

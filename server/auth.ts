@@ -12,19 +12,54 @@ export interface StoredUser {
   createdAt: string;
 }
 
-const DATA_DIR = path.resolve(process.cwd(), 'data');
-const USERS_FILE = path.join(DATA_DIR, 'users.json');
-
-// Ensure data directory exists
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+function getSafeDataDir(): string {
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    const tmpData = path.join('/tmp', 'infoguard_data');
+    if (!fs.existsSync(tmpData)) {
+      try {
+        fs.mkdirSync(tmpData, { recursive: true });
+        const localData = path.resolve(process.cwd(), 'data');
+        if (fs.existsSync(localData)) {
+          const files = fs.readdirSync(localData);
+          for (const f of files) {
+            const src = path.join(localData, f);
+            const dst = path.join(tmpData, f);
+            if (!fs.existsSync(dst)) {
+              fs.copyFileSync(src, dst);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Could not initialize /tmp data directory on serverless:', err);
+      }
+    }
+    return tmpData;
+  }
+  const localDir = path.resolve(process.cwd(), 'data');
+  if (!fs.existsSync(localDir)) {
+    try {
+      fs.mkdirSync(localDir, { recursive: true });
+    } catch {
+      return path.join('/tmp', 'infoguard_data');
+    }
+  }
+  return localDir;
 }
 
+const DATA_DIR = getSafeDataDir();
+const USERS_FILE = path.join(DATA_DIR, 'users.json');
+
+let inMemoryUsers: StoredUser[] = [];
+
 function loadUsers(): StoredUser[] {
+  if (inMemoryUsers.length > 0) {
+    return inMemoryUsers;
+  }
   try {
     if (fs.existsSync(USERS_FILE)) {
       const data = fs.readFileSync(USERS_FILE, 'utf-8');
-      return JSON.parse(data);
+      inMemoryUsers = JSON.parse(data);
+      return inMemoryUsers;
     }
   } catch (err) {
     console.error('Error loading users:', err);
@@ -33,10 +68,11 @@ function loadUsers(): StoredUser[] {
 }
 
 function saveUsers(users: StoredUser[]) {
+  inMemoryUsers = users;
   try {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
   } catch (err) {
-    console.error('Error saving users:', err);
+    console.error('Error saving users to file:', err);
   }
 }
 
