@@ -2,6 +2,14 @@
   "version": 2,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/**/*.ts": {
+      "includeFiles": [
+        "server/**",
+        "src/**"
+      ]
+    }
+  },
   "rewrites": [
     {
       "source": "/api/(.*)",
