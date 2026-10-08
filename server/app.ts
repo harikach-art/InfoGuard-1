@@ -228,6 +228,195 @@ export function createExpressApp() {
 
   apiRouter.post('/analyze', async (req: Request, res: Response) => {
     try {
+            // DEMO MODE — bypass external website fetching for hackathon demo
+      if (req.body?.demoMode === true) {
+        const demoReport: any = {
+          id: `demo-${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          scholarshipName:
+            req.body.scholarshipName ||
+            'PM-USP Central Sector Scheme of Scholarship',
+          primaryUrl: req.body.primaryUrl || '',
+          overallStatus: 'Requires Verification',
+          auditScore: 82,
+          riskLevel: 'Medium',
+          isFallback: true,
+          aiServiceStatus: 'Demo verification completed',
+          canRetryAi: false,
+
+          executiveSummary:
+            'InfoGuard detected inconsistencies across official scholarship sources. Verify the latest authoritative information before applying.',
+
+          sourcesAnalyzed: [
+            {
+              id: 'source-1',
+              name: 'Official Scholarship Portal',
+              url: req.body.primaryUrl || '',
+              type: 'portal',
+              authorityTier: 'Current Official Application Portal',
+            },
+            {
+              id: 'source-2',
+              name: 'Official Notification PDF',
+              type: 'notification',
+              authorityTier: 'Official Issued Notification',
+            },
+          ],
+
+          normalizedRequirements: [
+            {
+              id: 'req-1',
+              category: 'deadline',
+              title: 'Application Deadline',
+              displayValue: '10 October 2026',
+              sourceId: 'source-1',
+              sourceName: 'Official Scholarship Portal',
+              confidence: 0.94,
+            },
+            {
+              id: 'req-2',
+              category: 'income_limit',
+              title: 'Annual Family Income',
+              displayValue: 'Up to ₹4,50,000',
+              sourceId: 'source-1',
+              sourceName: 'Official Scholarship Portal',
+              confidence: 0.89,
+            },
+          ],
+
+          conflicts: [
+            {
+              id: 'conflict-1',
+              requirementCategory: 'deadline',
+              requirementTitle: 'Application Deadline',
+              classification: 'Contradiction',
+              severity: 'High',
+              sourceA: {
+                name: 'Official Scholarship Portal',
+                requirement: '10 October 2026',
+                evidence: 'Portal states 10 October 2026',
+              },
+              sourceB: {
+                name: 'Official Notification PDF',
+                requirement: '8 October 2026',
+                evidence: 'Notification states 8 October 2026',
+              },
+              assessment:
+                'Different deadlines appear across official sources.',
+              recommendedAction:
+                'Verify the final deadline using the latest official notification.',
+              confidence: 0.95,
+            },
+            {
+              id: 'conflict-2',
+              requirementCategory: 'documents',
+              requirementTitle: 'Identity Document',
+              classification: 'Conditional Difference',
+              severity: 'Medium',
+              sourceA: {
+                name: 'FAQ',
+                requirement: 'Aadhaar or PAN',
+              },
+              sourceB: {
+                name: 'Application Form',
+                requirement: 'Aadhaar mandatory',
+              },
+              assessment:
+                'Different identity-document requirements were detected.',
+              recommendedAction:
+                'Confirm the accepted identity document before submission.',
+              confidence: 0.87,
+            },
+          ],
+
+          missingInformation: [
+            'Latest confirmed application deadline',
+            'Final identity-document requirement',
+          ],
+
+          eligibilityAssessment: [
+            {
+              criterion: 'Course',
+              category: 'course',
+              applicantValue: req.body.applicant?.course || 'Undergraduate',
+              requirementValue: 'Eligible undergraduate course',
+              status: 'Likely Eligible',
+              confidence: 0.88,
+              evidence: 'Course requirement identified.',
+            },
+            {
+              criterion: 'Family Income',
+              category: 'income_limit',
+              applicantValue:
+                req.body.applicant?.annualFamilyIncome || 'Not provided',
+              requirementValue: 'Within prescribed limit',
+              status: 'Cannot Verify',
+              confidence: 0.72,
+              evidence: 'Income requirement requires verification.',
+            },
+          ],
+
+          overallEligibilityStatus: 'Conditionally Eligible',
+
+          documents: [
+            {
+              id: 'doc-1',
+              documentName: 'Aadhaar / Identity Proof',
+              status: 'Conditionally Required',
+              source: 'Official Notification',
+            },
+            {
+              id: 'doc-2',
+              documentName: 'Income Certificate',
+              status: 'Required',
+              source: 'Official Scholarship Portal',
+            },
+            {
+              id: 'doc-3',
+              documentName: 'Academic Mark Sheets',
+              status: 'Required',
+              source: 'Official Scholarship Portal',
+            },
+          ],
+
+          verificationQueue: [
+            {
+              id: 'verify-1',
+              whatToVerify: 'Final application deadline',
+              whyItMatters: 'Conflicting dates were detected.',
+              priority: 'High',
+              status: 'Conflict Detected',
+              recommendedAction:
+                'Verify the latest official notification.',
+            },
+            {
+              id: 'verify-2',
+              whatToVerify: 'Accepted identity documents',
+              whyItMatters: 'Sources contain different requirements.',
+              priority: 'Medium',
+              status: 'Needs Verification',
+              recommendedAction:
+                'Confirm accepted documents before submission.',
+            },
+          ],
+
+          finalRecommendation:
+            'Do not submit yet. Verify the conflicting official-source information before applying.',
+
+          authorityFindings: {
+            mostAuthoritativeSource: 'Current Official Application Portal',
+            potentiallyOutdatedSources: ['Official Notification PDF'],
+            summary:
+              'InfoGuard prioritizes the current official portal while flagging conflicting information for verification.',
+          },
+        };
+
+        res.json({
+          success: true,
+          report: demoReport,
+        });
+        return;
+      }
       const {
         scholarshipName,
         primaryUrl,
