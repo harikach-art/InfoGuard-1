@@ -1,5 +1,5 @@
 import React from 'react';
-import { Loader2, CheckCircle2, Clock, Shield, Sparkles } from 'lucide-react';
+import { Loader2, CheckCircle2, Clock, Shield, RotateCw, Sparkles } from 'lucide-react';
 
 export const PIPELINE_STAGES = [
   'Reading official sources',
@@ -17,12 +17,14 @@ interface AnalysisPipelineModalProps {
   currentStageIndex: number;
   error?: string | null;
   onDismissError?: () => void;
+  onRetry?: () => void;
 }
 
 export const AnalysisPipelineModal: React.FC<AnalysisPipelineModalProps> = ({
   currentStageIndex,
   error,
   onDismissError,
+  onRetry,
 }) => {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
@@ -38,7 +40,7 @@ export const AnalysisPipelineModal: React.FC<AnalysisPipelineModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-white tracking-tight">
-                {error ? 'Analysis Interrupted' : 'InfoGuard Active Audit'}
+                {error ? 'Analysis Notice' : 'InfoGuard Active Audit'}
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 {error
@@ -59,16 +61,25 @@ export const AnalysisPipelineModal: React.FC<AnalysisPipelineModalProps> = ({
         {error ? (
           <div className="py-6 space-y-4">
             <div className="p-4 rounded-xl bg-rose-950/40 border border-rose-800/60 text-xs text-rose-300 leading-relaxed space-y-1">
-              <span className="font-bold text-rose-200 block">Analysis Failure:</span>
+              <span className="font-bold text-rose-200 block">Analysis Request Notice:</span>
               <p>{error}</p>
             </div>
-            <div className="flex justify-end">
+            <div className="flex items-center justify-end space-x-2">
               <button
                 onClick={onDismissError}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors"
+                className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 Close and adjust sources
               </button>
+              {onRetry && (
+                <button
+                  onClick={onRetry}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer shadow-sm shadow-indigo-600/30"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>Retry Analysis</span>
+                </button>
+              )}
             </div>
           </div>
         ) : (

@@ -185,6 +185,8 @@ export default function App() {
           <RealityReportView
             report={activeReport}
             onBackToWorkspace={() => setActiveReport(null)}
+            onRetryAnalysis={handleRunAudit}
+            isRetrying={isAuditing}
           />
         ) : (
           /* Main InfoGuard Workspace */
@@ -242,6 +244,7 @@ export default function App() {
             setIsAuditing(false);
             setAuditError(null);
           }}
+          onRetry={handleRunAudit}
         />
       )}
 

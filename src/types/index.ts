@@ -91,11 +91,21 @@ export type ConflictClassification =
   | 'Ambiguous'
   | 'Cannot Determine';
 
+export type ConflictRelationship =
+  | 'MATCH'
+  | 'CONDITIONAL MATCH'
+  | 'CONFLICT'
+  | 'OMITTED'
+  | 'AMBIGUOUS'
+  | 'OUTDATED'
+  | 'UNVERIFIABLE';
+
 export interface ConflictItem {
   id: string;
   requirementCategory: string;
   requirementTitle: string;
   classification: ConflictClassification;
+  relationship: ConflictRelationship;
   severity: 'High' | 'Medium' | 'Low';
   sourceA: {
     sourceId: string;
@@ -105,6 +115,8 @@ export interface ConflictItem {
     date?: string;
     evidence: string;
     pageOrSection?: string;
+    authorityLevel?: string;
+    isNewer?: boolean;
   };
   sourceB: {
     sourceId: string;
@@ -114,7 +126,11 @@ export interface ConflictItem {
     date?: string;
     evidence: string;
     pageOrSection?: string;
+    authorityLevel?: string;
+    isNewer?: boolean;
   };
+  authorityComparison?: string;
+  recencyInformation?: string;
   assessment: string;
   confidence: number;
   recommendedAction: string;
@@ -156,12 +172,21 @@ export interface DocumentRequirementItem {
   notes?: string;
 }
 
+export type VerificationStatus =
+  | 'Confirmed'
+  | 'Needs Verification'
+  | 'Conflict Detected'
+  | 'Potentially Outdated'
+  | 'Cannot Verify';
+
 export interface VerificationQueueItem {
   id: string;
   whatToVerify: string;
   whyItMatters: string;
   source: string;
+  evidence?: string;
   priority: 'High' | 'Medium' | 'Low';
+  status: VerificationStatus;
   recommendedAction: string;
 }
 
@@ -177,6 +202,8 @@ export interface SourceAuditRow {
   requirementKey: string;
   requirementLabel: string;
   valuesBySource: Record<string, SourceAuditCell>;
+  comparison?: string;
+  evidenceSummary?: string;
   overallStatus:
     | 'Consistent'
     | 'Possible Conflict'
@@ -214,6 +241,11 @@ export interface RealityReport {
   finalRecommendation: string;
   auditScore?: number;
   riskLevel?: 'Mostly Consistent' | 'Needs Verification' | 'High Risk';
+  scoreExplanation?: string;
+  isFallback?: boolean;
+  aiServiceStatus?: string;
+  canRetryAi?: boolean;
+  isDemo?: boolean;
   authorityFindings: {
     mostAuthoritativeSource?: string;
     potentiallyOutdatedSources: string[];

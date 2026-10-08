@@ -17,6 +17,7 @@ import {
 } from './server/sourceFetcher';
 import {
   extractRequirementsWithGemini,
+  extractRequirementsDeterministically,
   RawSourceInput,
 } from './server/geminiAuditor';
 import {
@@ -281,8 +282,17 @@ async function startServer() {
         return;
       }
 
-      // 3. Structured Gemini extraction
-      const extraction = await extractRequirementsWithGemini(rawInputs, applicant);
+      // 3. Structured Gemini extraction with deterministic fallback safety net
+      let extraction;
+      try {
+        extraction = await extractRequirementsWithGemini(rawInputs, applicant);
+      } catch (geminiErr: any) {
+        console.warn('[Server] Gemini extraction threw error, executing deterministic fallback:', geminiErr?.message || geminiErr);
+        extraction = extractRequirementsDeterministically(rawInputs, applicant);
+        extraction.isFallback = true;
+        extraction.aiServiceStatus = 'AI analysis temporarily unavailable — deterministic verification completed';
+        extraction.canRetryAi = true;
+      }
 
       const effectiveScholarshipName =
         scholarshipName || extraction.detectedScholarshipName || 'Official Scholarship Program';
@@ -345,7 +355,12 @@ async function startServer() {
         overallStatus,
         auditScore,
         riskLevel,
-        executiveSummary: `Audited ${allSources.length} official source(s). InfoGuard identified ${extraction.requirements.length} structured requirement(s), ${conflicts.length} cross-source conflict(s), and compiled ${verificationQueue.length} action item(s) to verify before applying.`,
+        isFallback: extraction.isFallback,
+        aiServiceStatus: extraction.aiServiceStatus,
+        canRetryAi: extraction.canRetryAi,
+        executiveSummary: extraction.isFallback
+          ? `Audited ${allSources.length} official source(s) using InfoGuard's deterministic verification engine while the AI model was under temporary high demand. InfoGuard extracted ${extraction.requirements.length} structured rule(s), ${conflicts.length} cross-source conflict(s), and compiled ${verificationQueue.length} action item(s) to verify before applying.`
+          : `Audited ${allSources.length} official source(s). InfoGuard identified ${extraction.requirements.length} structured requirement(s), ${conflicts.length} cross-source conflict(s), and compiled ${verificationQueue.length} action item(s) to verify before applying.`,
         sourcesAnalyzed: allSources,
         normalizedRequirements: extraction.requirements,
         sourceAuditMatrix,

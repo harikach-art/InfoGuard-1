@@ -78,6 +78,71 @@ export function formatCurrency(amount: number, currency = '₹'): string {
   return `${currency}${amount.toLocaleString('en-US')}`;
 }
 
+// Helper to score authority tiers for conflict assessment
+export function getAuthorityTierWeight(tier?: AuthorityTier): number {
+  switch (tier) {
+    case 'Current Official Application Portal':
+      return 100;
+    case 'Official Issued Notification':
+      return 90;
+    case 'Official Application Form / Circular':
+      return 80;
+    case 'Official FAQ / Help Page':
+      return 70;
+    case 'Official Scholarship Webpage':
+      return 60;
+    case 'Archived or Undated Material':
+      return 30;
+    default:
+      return 50;
+  }
+}
+
+export function buildAuthorityComparison(srcA?: ScholarshipSource, srcB?: ScholarshipSource): string {
+  if (!srcA || !srcB) return 'Cross-verified across official documentation tiers.';
+  const weightA = getAuthorityTierWeight(srcA.authorityTier);
+  const weightB = getAuthorityTierWeight(srcB.authorityTier);
+
+  if (weightA > weightB) {
+    return `${srcA.name} (${srcA.authorityTier}) carries higher operational authority than ${srcB.name} (${srcB.authorityTier}). Portal/Notification parameters take precedence for active submissions.`;
+  }
+  if (weightB > weightA) {
+    return `${srcB.name} (${srcB.authorityTier}) carries higher operational authority than ${srcA.name} (${srcA.authorityTier}). Notification/Portal guidelines take precedence.`;
+  }
+  return `Both sources hold equal official authority level (${srcA.authorityTier || 'Official Source'}).`;
+}
+
+export function buildRecencyComparison(
+  dateA?: string,
+  dateB?: string,
+  srcAName?: string,
+  srcBName?: string
+): { recencyInformation: string; newerIs?: 'A' | 'B' | 'Equal' } {
+  const comp = compareDatesDiff(dateA, dateB);
+  if (!comp.daysApart && !dateA && !dateB) {
+    return {
+      recencyInformation: 'Publication dates not explicitly stated in source metadata.',
+      newerIs: undefined,
+    };
+  }
+  if (comp.newerIs === 'A') {
+    return {
+      recencyInformation: `${srcAName || 'Source A'} was issued on ${dateA}${comp.daysApart ? ` (${comp.daysApart} days after ${srcBName || 'Source B'})` : ''} and appears to be the more recent release.`,
+      newerIs: 'A',
+    };
+  }
+  if (comp.newerIs === 'B') {
+    return {
+      recencyInformation: `${srcBName || 'Source B'} was issued on ${dateB}${comp.daysApart ? ` (${comp.daysApart} days after ${srcAName || 'Source A'})` : ''} and appears to be the more recent release.`,
+      newerIs: 'B',
+    };
+  }
+  return {
+    recencyInformation: `Both official documents reference contemporaneous timelines (${dateA || dateB || 'Same period'}).`,
+    newerIs: 'Equal',
+  };
+}
+
 /**
  * Detect conflicts across normalized requirements from multiple sources
  */
@@ -110,22 +175,31 @@ export function detectConflictsDeterministically(
         const srcA = sourceMap.get(reqA.sourceId);
         const srcB = sourceMap.get(reqB.sourceId);
 
-        const dateComp = compareDatesDiff(reqA.publicationDate, reqB.publicationDate);
-        const hasAnewerDate = dateComp.newerIs === 'A';
-        const hasBnewerDate = dateComp.newerIs === 'B';
+        const recencyComp = buildRecencyComparison(
+          reqA.publicationDate,
+          reqB.publicationDate,
+          reqA.sourceName,
+          reqB.sourceName
+        );
+        const hasAnewerDate = recencyComp.newerIs === 'A';
+        const hasBnewerDate = recencyComp.newerIs === 'B';
+        const authorityComp = buildAuthorityComparison(srcA, srcB);
 
         // 1. DEADLINE COMPARISON
         if (category === 'deadline') {
           const deadlineComp = compareDatesDiff(reqA.dateValue || reqA.displayValue, reqB.dateValue || reqB.displayValue);
           if (deadlineComp.areDifferent) {
             let classification: ConflictClassification = 'Contradiction';
-            let assessment = `Sources state conflicting application deadlines. Source A reports "${reqA.displayValue}" while Source B reports "${reqB.displayValue}".`;
+            let relationship: ConflictItem['relationship'] = 'CONFLICT';
+            let assessment = `Sources state conflicting application deadlines. ${reqA.sourceName} reports "${reqA.displayValue}" while ${reqB.sourceName} reports "${reqB.displayValue}".`;
 
             if (reqA.conditionText || reqB.conditionText) {
               classification = 'Conditional Difference';
+              relationship = 'CONDITIONAL MATCH';
               assessment = `Application deadlines differ based on specific criteria or applicant phase (${reqA.conditionText || 'General'} vs ${reqB.conditionText || 'General'}).`;
             } else if (hasAnewerDate || hasBnewerDate) {
               classification = 'Appears Updated';
+              relationship = 'OUTDATED';
               const newerSrc = hasAnewerDate ? reqA.sourceName : reqB.sourceName;
               const olderSrc = hasAnewerDate ? reqB.sourceName : reqA.sourceName;
               assessment = `${newerSrc} was published later and appears to supersede or extend the deadline published in ${olderSrc}.`;
@@ -136,6 +210,7 @@ export function detectConflictsDeterministically(
               requirementCategory: 'deadline',
               requirementTitle: 'Application Deadline',
               classification,
+              relationship,
               severity: 'High',
               sourceA: {
                 sourceId: reqA.sourceId,
@@ -145,6 +220,8 @@ export function detectConflictsDeterministically(
                 date: reqA.publicationDate,
                 evidence: reqA.evidenceQuote,
                 pageOrSection: reqA.pageOrSection,
+                authorityLevel: srcA?.authorityTier || reqA.authorityTier,
+                isNewer: hasAnewerDate,
               },
               sourceB: {
                 sourceId: reqB.sourceId,
@@ -154,7 +231,11 @@ export function detectConflictsDeterministically(
                 date: reqB.publicationDate,
                 evidence: reqB.evidenceQuote,
                 pageOrSection: reqB.pageOrSection,
+                authorityLevel: srcB?.authorityTier || reqB.authorityTier,
+                isNewer: hasBnewerDate,
               },
+              authorityComparison: authorityComp,
+              recencyInformation: recencyComp.recencyInformation,
               assessment,
               confidence: 0.95,
               recommendedAction: 'Verify the active application portal closing date immediately before preparing or submitting application.',
@@ -169,13 +250,16 @@ export function detectConflictsDeterministically(
 
           if (valA !== undefined && valB !== undefined && valA !== valB) {
             let classification: ConflictClassification = 'Contradiction';
+            let relationship: ConflictItem['relationship'] = 'CONFLICT';
             let assessment = `Discrepancy in maximum family income threshold: ${reqA.sourceName} states ${reqA.displayValue}, whereas ${reqB.sourceName} states ${reqB.displayValue}.`;
 
             if (reqA.conditionText || reqB.conditionText) {
               classification = 'Conditional Difference';
+              relationship = 'CONDITIONAL MATCH';
               assessment = `Income ceilings differ conditionally: ${reqA.conditionText || 'Standard category'}: ${reqA.displayValue} vs ${reqB.conditionText || 'Special category'}: ${reqB.displayValue}.`;
             } else if (hasAnewerDate || hasBnewerDate) {
               classification = 'Potentially Outdated';
+              relationship = 'OUTDATED';
               const older = hasAnewerDate ? reqB.sourceName : reqA.sourceName;
               assessment = `Income threshold in ${older} may be outdated compared to newer issued notifications.`;
             }
@@ -185,6 +269,7 @@ export function detectConflictsDeterministically(
               requirementCategory: 'income_limit',
               requirementTitle: 'Annual Family Income Limit',
               classification,
+              relationship,
               severity: 'High',
               sourceA: {
                 sourceId: reqA.sourceId,
@@ -194,6 +279,8 @@ export function detectConflictsDeterministically(
                 date: reqA.publicationDate,
                 evidence: reqA.evidenceQuote,
                 pageOrSection: reqA.pageOrSection,
+                authorityLevel: srcA?.authorityTier || reqA.authorityTier,
+                isNewer: hasAnewerDate,
               },
               sourceB: {
                 sourceId: reqB.sourceId,
@@ -203,7 +290,11 @@ export function detectConflictsDeterministically(
                 date: reqB.publicationDate,
                 evidence: reqB.evidenceQuote,
                 pageOrSection: reqB.pageOrSection,
+                authorityLevel: srcB?.authorityTier || reqB.authorityTier,
+                isNewer: hasBnewerDate,
               },
+              authorityComparison: authorityComp,
+              recencyInformation: recencyComp.recencyInformation,
               assessment,
               confidence: 0.92,
               recommendedAction: 'Verify qualifying income certificate ceiling with the official issuing authority or latest circular before issuing income certificate.',
@@ -217,11 +308,15 @@ export function detectConflictsDeterministically(
           const valB = reqB.numericValue;
           if (valA !== undefined && valB !== undefined && valA !== valB) {
             const isConditional = Boolean(reqA.conditionText || reqB.conditionText);
+            const classification: ConflictClassification = isConditional ? 'Conditional Difference' : 'Contradiction';
+            const relationship: ConflictItem['relationship'] = isConditional ? 'CONDITIONAL MATCH' : 'CONFLICT';
+
             conflicts.push({
               id: `conflict-age-${reqA.id}-${reqB.id}`,
               requirementCategory: 'age_limit',
               requirementTitle: 'Age Limit',
-              classification: isConditional ? 'Conditional Difference' : 'Contradiction',
+              classification,
+              relationship,
               severity: 'High',
               sourceA: {
                 sourceId: reqA.sourceId,
@@ -231,6 +326,8 @@ export function detectConflictsDeterministically(
                 date: reqA.publicationDate,
                 evidence: reqA.evidenceQuote,
                 pageOrSection: reqA.pageOrSection,
+                authorityLevel: srcA?.authorityTier || reqA.authorityTier,
+                isNewer: hasAnewerDate,
               },
               sourceB: {
                 sourceId: reqB.sourceId,
@@ -240,7 +337,11 @@ export function detectConflictsDeterministically(
                 date: reqB.publicationDate,
                 evidence: reqB.evidenceQuote,
                 pageOrSection: reqB.pageOrSection,
+                authorityLevel: srcB?.authorityTier || reqB.authorityTier,
+                isNewer: hasBnewerDate,
               },
+              authorityComparison: authorityComp,
+              recencyInformation: recencyComp.recencyInformation,
               assessment: isConditional
                 ? `Age criteria vary based on categories or qualifications (${reqA.conditionText || 'General'} vs ${reqB.conditionText || 'Relaxation'}).`
                 : `Official sources provide conflicting maximum age limits (${reqA.displayValue} vs ${reqB.displayValue}).`,
@@ -256,11 +357,15 @@ export function detectConflictsDeterministically(
           const valB = reqB.numericValue;
           if (valA !== undefined && valB !== undefined && Math.abs(valA - valB) >= 1) {
             const isConditional = Boolean(reqA.conditionText || reqB.conditionText);
+            const classification: ConflictClassification = isConditional ? 'Conditional Difference' : 'Contradiction';
+            const relationship: ConflictItem['relationship'] = isConditional ? 'CONDITIONAL MATCH' : 'CONFLICT';
+
             conflicts.push({
               id: `conflict-academic-${reqA.id}-${reqB.id}`,
               requirementCategory: 'academic_percentage',
               requirementTitle: 'Minimum Academic Marks / Percentage',
-              classification: isConditional ? 'Conditional Difference' : 'Contradiction',
+              classification,
+              relationship,
               severity: 'Medium',
               sourceA: {
                 sourceId: reqA.sourceId,
@@ -270,6 +375,8 @@ export function detectConflictsDeterministically(
                 date: reqA.publicationDate,
                 evidence: reqA.evidenceQuote,
                 pageOrSection: reqA.pageOrSection,
+                authorityLevel: srcA?.authorityTier || reqA.authorityTier,
+                isNewer: hasAnewerDate,
               },
               sourceB: {
                 sourceId: reqB.sourceId,
@@ -279,7 +386,11 @@ export function detectConflictsDeterministically(
                 date: reqB.publicationDate,
                 evidence: reqB.evidenceQuote,
                 pageOrSection: reqB.pageOrSection,
+                authorityLevel: srcB?.authorityTier || reqB.authorityTier,
+                isNewer: hasBnewerDate,
               },
+              authorityComparison: authorityComp,
+              recencyInformation: recencyComp.recencyInformation,
               assessment: isConditional
                 ? `Qualifying percentage requirements differ by course or category (${reqA.conditionText || 'Standard'} vs ${reqB.conditionText || 'Relaxation'}).`
                 : `Sources disagree on minimum aggregate mark threshold (${reqA.displayValue} vs ${reqB.displayValue}).`,
@@ -289,24 +400,45 @@ export function detectConflictsDeterministically(
           }
         }
 
-        // 5. GENERAL TEXT / ELIGIBILITY / DOMICILE CONFLICTS
+        // 5. GENERAL TEXT / ELIGIBILITY / DOMICILE / CATEGORY / FEES CONFLICTS
         else {
           const normA = reqA.displayValue.trim().toLowerCase();
           const normB = reqB.displayValue.trim().toLowerCase();
 
-          // Check for blatant conflict in texts
+          // Check for direct contradictions (e.g., only vs all, free vs fee, mandatory vs optional)
           const hasNegation =
-            (normA.includes('only') && !normB.includes('only') && normB.includes('any')) ||
+            (normA.includes('only') && !normB.includes('only') && (normB.includes('all') || normB.includes('any') || normB.includes('open'))) ||
+            (normB.includes('only') && !normA.includes('only') && (normA.includes('all') || normA.includes('any') || normA.includes('open'))) ||
             (normA.includes('mandatory') && normB.includes('optional')) ||
-            (normB.includes('mandatory') && normA.includes('optional'));
+            (normB.includes('mandatory') && normA.includes('optional')) ||
+            (normA.includes('free') && normB.includes('fee')) ||
+            (normB.includes('free') && normA.includes('fee'));
 
-          if (hasNegation || (normA.length > 5 && normB.length > 5 && normA !== normB && !normA.includes(normB) && !normB.includes(normA))) {
+          // Check for distinct criteria in the same specific category
+          const isCategoryDiscrepancy =
+            category === 'category' &&
+            normA !== normB &&
+            ((normA.includes('sc') && !normB.includes('sc')) ||
+              (normA.includes('girls') && !normB.includes('girls')) ||
+              (normA.includes('minority') && !normB.includes('minority')));
+
+          const isDomicileDiscrepancy =
+            category === 'domicile' &&
+            normA !== normB &&
+            ((normA.includes('all india') && !normB.includes('all india')) ||
+              (normB.includes('all india') && !normA.includes('all india')));
+
+          if (hasNegation || isCategoryDiscrepancy || isDomicileDiscrepancy) {
             const isAmbiguous = normA.includes('subject to') || normB.includes('subject to') || normA.includes('as applicable');
+            const classification: ConflictClassification = isAmbiguous ? 'Ambiguous' : 'Contradiction';
+            const relationship: ConflictItem['relationship'] = isAmbiguous ? 'AMBIGUOUS' : 'CONFLICT';
+
             conflicts.push({
               id: `conflict-general-${reqA.id}-${reqB.id}`,
               requirementCategory: reqA.category,
               requirementTitle: reqA.title,
-              classification: isAmbiguous ? 'Ambiguous' : 'Contradiction',
+              classification,
+              relationship,
               severity: 'Medium',
               sourceA: {
                 sourceId: reqA.sourceId,
@@ -316,6 +448,8 @@ export function detectConflictsDeterministically(
                 date: reqA.publicationDate,
                 evidence: reqA.evidenceQuote,
                 pageOrSection: reqA.pageOrSection,
+                authorityLevel: srcA?.authorityTier || reqA.authorityTier,
+                isNewer: hasAnewerDate,
               },
               sourceB: {
                 sourceId: reqB.sourceId,
@@ -325,7 +459,11 @@ export function detectConflictsDeterministically(
                 date: reqB.publicationDate,
                 evidence: reqB.evidenceQuote,
                 pageOrSection: reqB.pageOrSection,
+                authorityLevel: srcB?.authorityTier || reqB.authorityTier,
+                isNewer: hasBnewerDate,
               },
+              authorityComparison: authorityComp,
+              recencyInformation: recencyComp.recencyInformation,
               assessment: `Official sources describe this requirement with diverging criteria: "${reqA.displayValue}" vs "${reqB.displayValue}".`,
               confidence: 0.82,
               recommendedAction: `Verify ${reqA.title} guidelines with official scholarship helpdesk before submission.`,
@@ -727,6 +865,12 @@ export function compileVerificationQueue(
       whyItMatters: conflict.assessment,
       source: `${conflict.sourceA.name} vs ${conflict.sourceB.name}`,
       priority: conflict.severity,
+      status:
+        conflict.classification === 'Contradiction'
+          ? 'Conflict Detected'
+          : conflict.classification === 'Potentially Outdated'
+          ? 'Potentially Outdated'
+          : 'Needs Verification',
       recommendedAction: conflict.recommendedAction,
     });
   });
@@ -741,6 +885,7 @@ export function compileVerificationQueue(
         whyItMatters: e.notes,
         source: e.sourceName,
         priority: 'High',
+        status: 'Needs Verification',
         recommendedAction: `Contact the scholarship nodal officer to verify whether ${e.applicantValue} meets the official cut-off.`,
       });
     });
@@ -754,6 +899,7 @@ export function compileVerificationQueue(
       whyItMatters: `Specific certificates (${conditionalDocs.map((d) => d.documentName).join(', ')}) are subject to category or state conditions.`,
       source: conditionalDocs[0]?.source || 'Official Guidelines',
       priority: 'Medium',
+      status: 'Needs Verification',
       recommendedAction: 'Verify whether physical stamped copies or digital DigiLocker verification is required before upload.',
     });
   }
@@ -767,6 +913,7 @@ export function compileVerificationQueue(
       whyItMatters: 'Online application form dropdowns and upload slots can occasionally differ from PDF circular guidelines.',
       source: portalSource.name,
       priority: 'Medium',
+      status: 'Needs Verification',
       recommendedAction: 'Complete portal registration early to review all mandatory fields and format restrictions well before the deadline.',
     });
   }

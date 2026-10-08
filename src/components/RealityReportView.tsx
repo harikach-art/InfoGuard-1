@@ -22,6 +22,8 @@ import {
   FileSpreadsheet,
   Globe,
   Laptop,
+  RotateCw,
+  RefreshCw,
 } from 'lucide-react';
 import {
   ConflictClassification,
@@ -35,11 +37,15 @@ import { getSourceTypeIcon } from './ScholarshipSourceSection';
 interface RealityReportViewProps {
   report: RealityReport;
   onBackToWorkspace: () => void;
+  onRetryAnalysis?: () => void;
+  isRetrying?: boolean;
 }
 
 export const RealityReportView: React.FC<RealityReportViewProps> = ({
   report,
   onBackToWorkspace,
+  onRetryAnalysis,
+  isRetrying,
 }) => {
   const [activeTab, setActiveTab] = useState<
     'overview' | 'conflicts' | 'queue' | 'eligibility' | 'matrix' | 'documents' | 'rules'
@@ -165,14 +171,54 @@ export const RealityReportView: React.FC<RealityReportViewProps> = ({
         </button>
 
         <div className="flex items-center space-x-2">
+          {onRetryAnalysis && (
+            <button
+              onClick={onRetryAnalysis}
+              disabled={isRetrying}
+              className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold transition-all shadow-sm shadow-indigo-600/20 disabled:opacity-50 cursor-pointer"
+            >
+              <RotateCw className={`w-3.5 h-3.5 ${isRetrying ? 'animate-spin' : ''}`} />
+              <span>{isRetrying ? 'Auditing...' : 'Re-run Audit'}</span>
+            </button>
+          )}
+
           <button
             onClick={handlePrint}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all shadow-2xs hover:shadow-xs"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all shadow-2xs hover:shadow-xs cursor-pointer"
           >
             <Printer className="w-3.5 h-3.5 text-slate-500" />
             <span>Print Report</span>
           </button>
         </div>
+      </div>
+
+      {/* Clean, subtle analysis status bar */}
+      <div className="p-3 sm:px-4 sm:py-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-950 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 print:hidden shadow-2xs">
+        <div className="flex items-center space-x-2.5">
+          <div className="w-5 h-5 rounded-full bg-emerald-600/15 border border-emerald-600/30 text-emerald-700 flex items-center justify-center shrink-0">
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 text-xs">
+            <span className="font-bold text-emerald-950">
+              ✓ Analysis completed
+            </span>
+            <span className="hidden sm:inline text-emerald-600/40">&bull;</span>
+            <span className="text-emerald-800 font-medium">
+              Sources analyzed and cross-checked successfully.
+            </span>
+          </div>
+        </div>
+
+        {onRetryAnalysis && (
+          <button
+            onClick={onRetryAnalysis}
+            disabled={isRetrying}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-all shadow-2xs hover:shadow-xs disabled:opacity-50 cursor-pointer self-end sm:self-auto shrink-0"
+          >
+            <RotateCw className={`w-3 h-3 text-slate-500 ${isRetrying ? 'animate-spin' : ''}`} />
+            <span>{isRetrying ? 'Checking...' : 'Retry Analysis'}</span>
+          </button>
+        )}
       </div>
 
       {/* WOW FACTOR: Dark Navy Executive Audit Header Card */}
@@ -597,7 +643,7 @@ export const RealityReportView: React.FC<RealityReportViewProps> = ({
                           onClick={() => setExpandedConflictId(isExpanded ? null : conflict.id)}
                           className="p-5 flex items-center justify-between cursor-pointer hover:bg-slate-50/60 transition-colors"
                         >
-                          <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-2.5 sm:space-x-3">
                             <span
                               className={`px-2.5 py-1 rounded-md text-[10px] font-bold border uppercase tracking-wider ${getConflictClassificationBadge(
                                 conflict.classification
@@ -605,6 +651,11 @@ export const RealityReportView: React.FC<RealityReportViewProps> = ({
                             >
                               {conflict.classification}
                             </span>
+                            {conflict.relationship && (
+                              <span className="hidden sm:inline-block px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-100 text-slate-600 border border-slate-200">
+                                {conflict.relationship}
+                              </span>
+                            )}
                             <div>
                               <h4 className="text-xs sm:text-sm font-bold text-slate-900">
                                 {conflict.requirementTitle}
@@ -638,19 +689,32 @@ export const RealityReportView: React.FC<RealityReportViewProps> = ({
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {/* Source A Card */}
                               <div className="p-4 rounded-xl border border-slate-200 bg-white space-y-2.5 shadow-2xs">
-                                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                                  <div className="flex items-center space-x-2">
-                                    <Globe className="w-3.5 h-3.5 text-blue-500" />
+                                <div className="flex items-center justify-between pb-2 border-b border-slate-100 gap-2">
+                                  <div className="flex items-center space-x-2 min-w-0">
+                                    <Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" />
                                     <span className="font-bold text-slate-900 truncate">
                                       {conflict.sourceA.name}
                                     </span>
                                   </div>
-                                  {conflict.sourceA.date && (
-                                    <span className="text-[10px] text-slate-400">
-                                      {conflict.sourceA.date}
-                                    </span>
-                                  )}
+                                  <div className="flex items-center space-x-1.5 shrink-0">
+                                    {conflict.sourceA.isNewer && (
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                                        Newer
+                                      </span>
+                                    )}
+                                    {conflict.sourceA.date && (
+                                      <span className="text-[10px] text-slate-400">
+                                        {conflict.sourceA.date}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
+
+                                {conflict.sourceA.authorityLevel && (
+                                  <div className="text-[10px] text-slate-500 font-medium">
+                                    Tier: <span className="text-slate-700 font-semibold">{conflict.sourceA.authorityLevel}</span>
+                                  </div>
+                                )}
 
                                 <div>
                                   <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -679,19 +743,32 @@ export const RealityReportView: React.FC<RealityReportViewProps> = ({
 
                               {/* Source B Card */}
                               <div className="p-4 rounded-xl border border-rose-200/80 bg-white space-y-2.5 shadow-2xs">
-                                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-                                  <div className="flex items-center space-x-2">
-                                    <FileText className="w-3.5 h-3.5 text-rose-500" />
+                                <div className="flex items-center justify-between pb-2 border-b border-slate-100 gap-2">
+                                  <div className="flex items-center space-x-2 min-w-0">
+                                    <FileText className="w-3.5 h-3.5 text-rose-500 shrink-0" />
                                     <span className="font-bold text-slate-900 truncate">
                                       {conflict.sourceB.name}
                                     </span>
                                   </div>
-                                  {conflict.sourceB.date && (
-                                    <span className="text-[10px] text-slate-400">
-                                      {conflict.sourceB.date}
-                                    </span>
-                                  )}
+                                  <div className="flex items-center space-x-1.5 shrink-0">
+                                    {conflict.sourceB.isNewer && (
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-200">
+                                        Newer
+                                      </span>
+                                    )}
+                                    {conflict.sourceB.date && (
+                                      <span className="text-[10px] text-slate-400">
+                                        {conflict.sourceB.date}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
+
+                                {conflict.sourceB.authorityLevel && (
+                                  <div className="text-[10px] text-slate-500 font-medium">
+                                    Tier: <span className="text-slate-700 font-semibold">{conflict.sourceB.authorityLevel}</span>
+                                  </div>
+                                )}
 
                                 <div>
                                   <span className="text-[10px] font-bold text-slate-400 uppercase block mb-1">
@@ -718,6 +795,30 @@ export const RealityReportView: React.FC<RealityReportViewProps> = ({
                                 )}
                               </div>
                             </div>
+
+                            {/* Authority & Recency Analysis Ribbon */}
+                            {(conflict.authorityComparison || conflict.recencyInformation) && (
+                              <div className="p-3.5 rounded-xl bg-slate-100/70 border border-slate-200/80 space-y-1.5 text-xs">
+                                {conflict.authorityComparison && (
+                                  <div className="flex items-start gap-2 text-slate-700">
+                                    <Layers className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                                    <span>
+                                      <strong className="text-slate-900 font-semibold">Authority Weight:</strong>{' '}
+                                      {conflict.authorityComparison}
+                                    </span>
+                                  </div>
+                                )}
+                                {conflict.recencyInformation && (
+                                  <div className="flex items-start gap-2 text-slate-700">
+                                    <Clock className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+                                    <span>
+                                      <strong className="text-slate-900 font-semibold">Recency Analysis:</strong>{' '}
+                                      {conflict.recencyInformation}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             {/* InfoGuard Assessment & Recommended Verification */}
                             <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-2xs">
