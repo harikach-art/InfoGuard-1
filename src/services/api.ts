@@ -211,7 +211,7 @@ export async function runAnalysisApi(params: {
     isFallback: true,
     canRetryAi: false,
   } as unknown as RealityReport;
-
+console.log("INFOGUARD DEMO REPORT:", report);
   return report;
 }
 
