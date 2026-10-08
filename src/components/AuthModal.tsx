@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, Lock, User, ArrowRight, AlertCircle, Loader2, ShieldCheck } from 'lucide-react';
-import { loginApi, loginWithGoogleApi, registerApi } from '../services/api';
+import { loginApi, registerApi, setSession } from '../services/api';
 import { UserSession } from '../types';
 
 interface AuthModalProps {
@@ -61,20 +61,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   const handleGoogleSignIn = async () => {
-    setError(null);
-    setIsLoading(true);
-    try {
-      const userEmail = email.trim() || 'applicant@gmail.com';
-      const userName = name.trim() || 'Scholarship Applicant';
-      const res = await loginWithGoogleApi(userEmail, userName);
-      onSuccess(res.user);
-    } catch (err: any) {
-      setError(err.message || 'Google authentication failed.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  setError(null);
+  setIsLoading(true);
 
+  try {
+    const user = {
+      id: 'demo-user',
+      name: name.trim() || 'Scholarship Applicant',
+      email: email.trim() || 'applicant@gmail.com',
+      createdAt: new Date().toISOString(),
+    };
+
+    const token = 'infoguard-demo-session';
+    setSession(token, user);
+    onSuccess(user);
+  } catch (err: any) {
+    setError(err.message || 'Authentication failed.');
+  } finally {
+    setIsLoading(false);
+  }
+};
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
       <div
