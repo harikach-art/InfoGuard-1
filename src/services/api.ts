@@ -135,86 +135,327 @@ export async function runAnalysisApi(params: {
 }): Promise<RealityReport> {
   await new Promise((resolve) => setTimeout(resolve, 1500));
 
-  const report = {
+  const now = new Date().toISOString();
+
+  const sourcesAnalyzed: any[] = [
+    {
+      id: 'source-1',
+      name: 'Official Scholarship Website',
+      type: 'website',
+      authorityTier: 'Primary Official Source',
+      authorityLevel: 'Highest',
+      url: params.primaryUrl,
+      publicationDate: '2026',
+    },
+    {
+      id: 'source-2',
+      name: 'Official Notification PDF',
+      type: 'pdf',
+      authorityTier: 'Official Notification',
+      authorityLevel: 'High',
+      url: '',
+      publicationDate: '2026',
+    },
+    {
+      id: 'source-3',
+      name: 'Official FAQ',
+      type: 'pdf',
+      authorityTier: 'Official FAQ',
+      authorityLevel: 'Medium',
+      url: '',
+      publicationDate: '2026',
+    },
+  ];
+
+  const conflicts: any[] = [
+    {
+      id: 'conflict-1',
+      requirementTitle: 'Application Deadline',
+      classification: 'Contradiction',
+      relationship: 'Direct Conflict',
+      severity: 'High',
+      confidence: 0.96,
+      sourceA: {
+        name: 'Official Scholarship Website',
+        requirement: '10 October 2026',
+        evidence: 'Application deadline shown as 10 October 2026.',
+        pageOrSection: 'Scholarship Portal',
+        authorityLevel: 'Highest',
+        isNewer: true,
+        date: '2026',
+      },
+      sourceB: {
+        name: 'Official Notification PDF',
+        requirement: '8 October 2026',
+        evidence: 'Notification states the deadline as 8 October 2026.',
+        pageOrSection: 'Notification PDF, Page 2',
+        authorityLevel: 'High',
+        isNewer: false,
+        date: '2026',
+      },
+      assessment:
+        'The same scholarship has different deadlines across official sources.',
+      recommendedAction:
+        'Confirm the final deadline using the latest official notification before applying.',
+      authorityComparison:
+        'The latest official notification should receive higher weight.',
+      recencyInformation:
+        'The notification date should be checked against the portal update.',
+    },
+    {
+      id: 'conflict-2',
+      requirementTitle: 'Identity Document',
+      classification: 'Conditional Difference',
+      relationship: 'Requirement Difference',
+      severity: 'Medium',
+      confidence: 0.91,
+      sourceA: {
+        name: 'Official FAQ',
+        requirement: 'Aadhaar or PAN',
+        evidence: 'FAQ indicates Aadhaar or PAN may be accepted.',
+        pageOrSection: 'FAQ',
+        authorityLevel: 'Medium',
+        isNewer: false,
+        date: '2026',
+      },
+      sourceB: {
+        name: 'Application Form',
+        requirement: 'Aadhaar mandatory',
+        evidence: 'Application form requests Aadhaar as mandatory.',
+        pageOrSection: 'Application Form',
+        authorityLevel: 'High',
+        isNewer: true,
+        date: '2026',
+      },
+      assessment:
+        'The application form appears stricter than the FAQ.',
+      recommendedAction:
+        'Verify whether PAN is accepted before submitting the application.',
+      authorityComparison:
+        'The live application form may reflect the current submission requirement.',
+      recencyInformation:
+        'Verify the latest version of the form.',
+    },
+  ];
+
+  const verificationQueue: any[] = [
+    {
+      id: 'verify-1',
+      whatToVerify: 'Final application deadline',
+      priority: 'High',
+      whyItMatters: 'Applying after the final deadline may make the application invalid.',
+      source: 'Website vs Notification PDF',
+      recommendedAction: 'Confirm the latest deadline from the official authority.',
+    },
+    {
+      id: 'verify-2',
+      whatToVerify: 'Aadhaar requirement',
+      priority: 'Medium',
+      whyItMatters: 'The FAQ and application form show different requirements.',
+      source: 'FAQ vs Application Form',
+      recommendedAction: 'Confirm whether PAN is accepted.',
+    },
+    {
+      id: 'verify-3',
+      whatToVerify: 'Income limit',
+      priority: 'Medium',
+      whyItMatters: 'Income eligibility must match the current notification.',
+      source: 'Official Notification',
+      recommendedAction: 'Check the latest income-limit requirement.',
+    },
+    {
+      id: 'verify-4',
+      whatToVerify: 'Document checklist',
+      priority: 'Low',
+      whyItMatters: 'Missing documents can delay or invalidate submission.',
+      source: 'Official Notification',
+      recommendedAction: 'Check the latest official document checklist.',
+    },
+  ];
+
+  const eligibilityAssessment: any[] = [
+    {
+      criterion: 'Course Eligibility',
+      status: 'Likely Eligible',
+      applicantValue: params.applicant.course || 'B.Tech Data Science',
+      requirementValue: 'Undergraduate degree',
+      notes: 'Applicant is pursuing an undergraduate course.',
+      evidence: 'Undergraduate students are eligible subject to other conditions.',
+      sourceName: 'Official Notification',
+      hasConflictWarning: false,
+    },
+    {
+      criterion: 'Family Income',
+      status: 'Likely Eligible',
+      applicantValue: `₹${params.applicant.annualFamilyIncome || 300000}`,
+      requirementValue: 'Up to ₹4,50,000 per year',
+      notes: 'Applicant income is within the displayed threshold.',
+      evidence: 'Annual family income requirement.',
+      sourceName: 'Official Notification',
+      hasConflictWarning: false,
+    },
+    {
+      criterion: 'Deadline',
+      status: 'Conditionally Eligible',
+      applicantValue: 'Application before deadline',
+      requirementValue: 'Conflicting dates across sources',
+      notes: 'Deadline must be verified before submission.',
+      evidence: 'Different deadlines appear in official sources.',
+      sourceName: 'Official Sources',
+      hasConflictWarning: true,
+    },
+  ];
+
+  const documents: any[] = [
+    {
+      id: 'doc-1',
+      documentName: 'Aadhaar Card',
+      status: 'Required',
+      condition: 'Verify whether PAN is also accepted.',
+      evidence: 'Identity document requirement.',
+      source: 'Application Form',
+    },
+    {
+      id: 'doc-2',
+      documentName: 'Income Certificate',
+      status: 'Required',
+      condition: 'Required where applicable.',
+      evidence: 'Income verification requirement.',
+      source: 'Official Notification',
+    },
+    {
+      id: 'doc-3',
+      documentName: 'Academic Mark Sheets',
+      status: 'Required',
+      condition: 'Academic performance verification.',
+      evidence: 'Academic records requirement.',
+      source: 'Official Notification',
+    },
+    {
+      id: 'doc-4',
+      documentName: 'Bank Account Details',
+      status: 'Required',
+      condition: 'For scholarship disbursement.',
+      evidence: 'Bank details requirement.',
+      source: 'Application Portal',
+    },
+  ];
+
+  const normalizedRequirements: any[] = [
+    {
+      id: 'rule-1',
+      category: 'DEADLINE',
+      title: 'Application Deadline',
+      displayValue: '10 October 2026',
+      evidenceQuote: 'Deadline shown on official scholarship portal.',
+      sourceName: 'Official Scholarship Website',
+      confidence: 0.96,
+    },
+    {
+      id: 'rule-2',
+      category: 'INCOME',
+      title: 'Annual Family Income',
+      displayValue: '₹4,50,000 per year',
+      numericValue: 450000,
+      evidenceQuote: 'Annual family income limit.',
+      sourceName: 'Official Notification',
+      confidence: 0.91,
+    },
+    {
+      id: 'rule-3',
+      category: 'COURSE',
+      title: 'Course',
+      displayValue: 'Undergraduate degree',
+      evidenceQuote: 'Undergraduate students are covered.',
+      sourceName: 'Official Notification',
+      confidence: 0.94,
+    },
+  ];
+
+  const sourceAuditMatrix: any = {
+    sources: sourcesAnalyzed.map((s) => ({
+      id: s.id,
+      name: s.name,
+      tier: s.authorityTier,
+    })),
+    rows: [
+      {
+        requirementKey: 'deadline',
+        requirementLabel: 'Application Deadline',
+        valuesBySource: {
+          'source-1': {
+            value: '10 October 2026',
+            evidence: 'Portal deadline',
+          },
+          'source-2': {
+            value: '8 October 2026',
+            evidence: 'Notification deadline',
+          },
+          'source-3': {
+            value: 'Not specified',
+            evidence: '',
+          },
+        },
+        overallStatus: 'Possible Conflict',
+      },
+      {
+        requirementKey: 'identity',
+        requirementLabel: 'Identity Document',
+        valuesBySource: {
+          'source-1': {
+            value: 'Aadhaar',
+            evidence: 'Application requirement',
+          },
+          'source-2': {
+            value: 'Aadhaar or PAN',
+            evidence: 'FAQ guidance',
+          },
+          'source-3': {
+            value: 'Aadhaar',
+            evidence: 'Form requirement',
+          },
+        },
+        overallStatus: 'Possible Conflict',
+      },
+    ],
+  };
+
+  return {
+    id: `demo-${Date.now()}`,
+    createdAt: now,
     scholarshipName:
       params.scholarshipName ||
-      "PM-USP Central Sector Scheme of Scholarship",
+      'PM-USP Central Sector Scheme of Scholarship for College and University Students',
+    primaryUrl: params.primaryUrl,
     auditScore: 87,
-    recommendation:
-      "Conditionally Eligible — verify conflicting requirements before applying.",
-    requirements: {
-      deadline: "10 October 2026",
-      eligibility:
-        "Undergraduate students meeting the scholarship's academic and income requirements.",
-      incomeLimit: "₹4,50,000 per year",
-      course: "Undergraduate degree",
-      category: "Eligible categories as specified by the official notification",
-      fees: "No application fee mentioned",
-      documents: [
-        "Aadhaar Card",
-        "Income Certificate",
-        "Academic Mark Sheets",
-        "Bank Account Details",
-        "Bonafide / College Certificate",
-      ],
+    riskLevel: 'Mostly Consistent',
+    overallEligibilityStatus: 'Conditionally Eligible',
+    finalRecommendation:
+      'Conditionally Eligible — verify conflicting requirements before applying.',
+    executiveSummary:
+      'InfoGuard found multiple official sources for this scholarship and identified important differences that should be verified before submission.',
+    sourcesAnalyzed,
+    conflicts,
+    verificationQueue,
+    eligibilityAssessment,
+    documents,
+    normalizedRequirements,
+    sourceAuditMatrix,
+    missingInformation: [
+      'Latest deadline confirmation is required.',
+      'Identity-document requirement should be confirmed.',
+    ],
+    authorityFindings: {
+      summary:
+        'Official sources were compared using source authority and recency.',
+      potentiallyOutdatedSources: [],
     },
-    conflicts: [
-      {
-        field: "Application Deadline",
-        severity: "High",
-        sourceA: "Official Scholarship Website",
-        valueA: "10 October 2026",
-        sourceB: "Official Notification PDF",
-        valueB: "8 October 2026",
-        explanation:
-          "Different deadlines are displayed across official sources.",
-      },
-      {
-        field: "Identity Document",
-        severity: "Medium",
-        sourceA: "FAQ",
-        valueA: "Aadhaar or PAN",
-        sourceB: "Application Form",
-        valueB: "Aadhaar mandatory",
-        explanation:
-          "The application form appears stricter than the FAQ.",
-      },
-    ],
-    eligibility: {
-      status: "Conditionally Eligible",
-      reasons: [
-        "Applicant is pursuing an undergraduate course.",
-        "Required academic and income information should be verified.",
-        "Some source requirements are inconsistent.",
-      ],
-    },
-    verificationQueue: [
-      "Confirm the final application deadline on the latest official notification.",
-      "Verify whether Aadhaar is mandatory or PAN is accepted.",
-      "Confirm the current income-limit requirement.",
-      "Check the latest official document checklist before submission.",
-    ],
-    sources: [
-      {
-        title: "Official Scholarship Website",
-        url: params.primaryUrl,
-        authority: "Primary",
-      },
-      ...((params.additionalSources || []).map((source: any) => ({
-        title: source.title || "Additional Official Source",
-        url: source.url || "",
-        authority: "Official",
-      }))),
-    ],
     aiServiceStatus:
-      "AI audit completed with deterministic verification fallback.",
+      'AI audit completed with deterministic verification fallback.',
     isFallback: true,
     canRetryAi: false,
   } as unknown as RealityReport;
-console.log("INFOGUARD DEMO REPORT:", report);
-  return report;
 }
-
 export async function fetchReportHistoryApi(): Promise<RealityReport[]> {
   const res = await fetch('/api/reports', {
     headers: getAuthHeaders(),
